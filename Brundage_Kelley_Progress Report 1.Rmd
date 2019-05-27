@@ -1,0 +1,242 @@
+---
+title: "Progress Report 1"
+Date: "23/May/2019"
+GitHub: https://github.com/klbrundage/LLO8200-Assignments
+output:
+  word_document: default
+  pdf_document: default
+fontsize: 12pt
+geometry: margin=.5
+autosize: yes
+Author: "Kelley Brundage"
+---
+
+```{r setup, include=FALSE}
+##This code allows the Knit function to still work even with errors 
+knitr::opts_chunk$set(echo=TRUE,error=TRUE)
+```
+
+```{r global_options, include = FALSE}
+##This code does not show in the final document but will assist with definining the margin cutoff point and wraps the text to the next line.
+knitr::opts_chunk$set(message=FALSE, 
+tidy.opts=list(width.cutoff=60)) 
+```
+
+```{r eval=F, tidy=T}
+##The `eval=FALSE` option just displays the R code (and does not run it), `tidy=TRUE` wraps long code so it does not run off the page.
+
+##Below are the standard set of setup commands and common libraries that may be needed when running data analysis.
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(dplyr))
+suppressMessages(library(tibble))
+suppressMessages(library(evaluate))
+suppressMessages(library(forcats))
+suppressMessages(library(formatR))
+suppressMessages(library(ggplot2))
+suppressMessages(library(haven))
+suppressMessages(library(knitr))
+suppressMessages(library(readxl))
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(tidyverse))
+```
+
+```{r Import Datasets}
+##The code below will upload the World University Ranking Datasets obtained from Kaggle.com
+
+##The next set of files are the three World Ranking system files
+library(readxl)
+cwurData <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/cwurData.xlsx")
+View(cwurData)
+
+library(readxl)
+shanghaiData <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/shanghaiData.xlsx")
+View(shanghaiData)
+
+library(readxl)
+timesData <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/timesData.xlsx")
+View(timesData)
+
+##The three datasets below are the additional datasets provided that connect to the World University Ranking datasets
+library(readxl)
+education_expenditure_supplementary_data <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/education_expenditure_supplementary_data.xlsx")
+View(education_expenditure_supplementary_data)
+
+library(readxl)
+educational_attainment_supplementary_data <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/educational_attainment_supplementary_data.xlsx")
+View(educational_attainment_supplementary_data)
+
+##The file below lists the name of the institution and the Country the institution is located in
+library(readxl)
+school_and_country_table <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/school_and_country_table.xlsx")
+View(school_and_country_table)
+```
+
+# Progress Report 1:  World University Rankings
+
+# **Introduction**
+Ranking universities is very challenging and comes with a variety of political and controversial practices.  Throughout the world, there are hundreds of different national and international university ranking systems, many that disagree with each other.  
+
+Fortunately, there are a series of public resources available that provide ranking data of this nature.  Specifically, I have chosen the World University Ranking dataset provided on Kaggle.com as these files contain three global university rankings from various places throughout the world.
+
+Having the ability to identify and understand how hundreds of institutions throughout the world compare to each other is vital to ensuring accuracy and acceptability.  Nevertheless, ranking systems continue to be famous for what they have been doing over the decades, highlighting who is the best of the best in the global context.  
+  
+
+# *Introduce Problem and Approach*
+I intend to compare the three global ranking systems to the amount of faculty, publications/research at each institution per ranking system by approaching each dataset with an analytical and statistical viewpoint. 
+
+I am analyzing the dataset specific to the area of research/academic and if common challenges that exist with all ranking systems exist.  Problems such as making the correction for institutional size, differences between average and extreme, defining the institutions, measurement of time frame, credit allocation, excellency factors as well as adjustment for scientific fields or types of research.
+
+# **Data**
+
+# *How was the data acquired?*
+Kaggle.com Dataset file: World University Rankings
+website: https://www.kaggle.com/mylesoneill/world-university-rankings
+
+# *Format of Data*
+
+There are a total of six files (.csv) that make up this data set containing three ranking systems: Times Higher Education World University Ranking; Academic Ranking of World Universities (Shanghai Ranking) and The Center for World University Rankings.
+
+### **University Ranking Data**
+
+The *Times Higher Education World University Ranking* is widely regarded as one of the most influential and widely observed university measures. Founded in the United Kingdom in 2010, it has been criticized for its commercialization and for undermining non-English-instructing institutions.
+
+The *Academic Ranking of World Universities*, also known as the *Shanghai Ranking*, is an equally influential ranking. It was founded in China in 2003 and has been criticized for focusing on raw research power and for undermining humanities and quality of instruction.
+
+The *Center for World University Rankings* is a less well know listing that comes from Saudi Arabia, founded in 2012.
+
+    1. How do these rankings compare to each other?
+    2. Are the various criticisms levied against these rankings fair or not?
+    3. How does your alma mater fare against the world?
+
+### **Supplementary Data**
+
+To further extend the analyses, there are two additional sets of supplementary data.
+
+The first of these is a set of data on **educational attainment** around the world. It comes from The World Data Bank and comprises information from the UNESCO Institute for Statistics and the Barro-Lee Dataset. 
+
+The second supplementary dataset contains information about **public and private direct expenditure on education across nations**. This data comes from the National Center for Education Statistics. It represents expenditure as a percentage of gross domestic product. 
+
+# **Describe data/Variables**
+
+### *Center for World University Rankins Methodology*
+Publishes the only global university ranking that measures the quality of education and training of students as well as the prestige of the faculty members and the quality of their research without relying on surveys and university data submissions.
+
+CWUR uses seven objective and robust indicators to rank the worlds top 1000 universities:
+    1. Quality of Education, measured by the number of a 
+        university's alumni who have won major international 
+        awards, prizes, and medals relative to the 
+        university's size (15%) 
+    2. Alumni Employment, measured by the number of a 
+        university's alumni who have held CEO positions at 
+        the world's top companies relative to the 
+        university's size (15%) 
+    3. Quality of Faculty, measured by the number of 
+        academics who have won major international awards, 
+        prizes, and medals (15%) 
+    4. Research Output, measured by the total number of 
+        research papers (15%) 
+    5. Quality Publications, measured by the number of 
+        research papers appearing in top-tier journals (15%) 
+    6. Influence, measured by the number of research papers 
+        appearing in highly-influential journals (15%) 
+    7. Citations, measured by the number of highly-cited 
+        research papers (10%)
+
+### *ARWU/Shanghai Methodology*
+ARWU considers every university that has any Nobel Laureates, Fields Medalists, Highly Cited Researchers, or papers published in Nature or Science. Also, universities with a significant amount of papers indexed by Science Citation Index-Expanded (SCIE) and Social Science Citation Index (SSCI) are included. In total, more than 1200 universities are ranked, and the best 500 are published on the web.
+
+Universities are ranked by several indicators of academic or research performance, including alumni and staff winning Nobel Prizes and Fields Medals, highly cited researchers, papers published in Nature and Science, papers indexed in major citation indices, and the per capita academic performance of an institution. For each indicator, the highest scoring institution is assigned a score of 100, and other institutions are calculated as a percentage of the top score. The distribution of data for each indicator is examined for any significant distorting effect; standard statistical techniques are used to adjust the indicator if necessary. Scores for each indicator are weighted as shown below to arrive at a final overall score for an institution. The highest scoring institution is assigned a score of 100, and other institutions are calculated as a percentage of the top score. An institution's rank reflects the number of institutions that sit above it.
+
+### *Times Dataset Methodology*
+Only global performance tables that judge research-intensive universities across all their core missions: teaching, research, knowledge transfer and international outlook. We use 13 carefully calibrated performance indicators to provide the most comprehensive and balanced comparisons, trusted by students, academics, university leaders, industry, and even governments. The basic methodology for this year’s rankings is similar to that employed since the 2011-12 tables, but we have made important changes to the underlying data.
+
+The performance indicators are grouped into five areas:
+
+    Teaching (the learning environment)
+    Research (volume, income, and reputation)
+    Citations (research influence)
+    International outlook (staff, students, and research)
+    Industry income (knowledge transfer).
+
+## **Supporting Displays/Visualizations**
+
+### *Visualizations by the three ranking datasets*
+The data visualizations below are current placeholders and are not representative yet of the indented problem that has been introduced at the beginning of this document.  
+
+#### *CWUR Dataset*
+
+```{r Country Data from CWUR dataset}
+##shows the number of times each country is referenced in the cwur dataset
+cwurData%>%
+  count(country)%>%
+  arrange(-n)
+```
+
+```{r Histogram of country references in CWUR dataset}
+gg<-ggplot(cwurData,aes(x=country))
+gg<-gg+geom_histogram(stat="count",binwidth = 20,fill="darkgreen")
+
+gg<-gg+ylab("Count")+xlab("Country") ## x & y axis labels
+gg<-gg+theme(axis.text.x = element_text(angle = 60, hjust = 1))
+gg<-gg+ggtitle("References to Country in CWUR Dataset") ## Chart Title
+gg
+```
+
+```{r}
+cwurData%>%
+  group_by(national_rank)%>%
+  summarize(country=n_distinct(country))%>%
+  arrange(desc(country))
+```
+
+#### *Times Dataset*
+
+```{r Country Data from Times dataset}
+##shows the number of times each country is referenced in the cwur dataset
+timesData%>%
+  count(country)%>%
+  arrange(-n)
+```
+
+```{r Histogram of country references in Times dataset}
+gg<-ggplot(timesData,aes(x=country))
+gg<-gg+geom_histogram(stat="count",binwidth = 20,fill="darkgreen")
+
+gg<-gg+ylab("Count")+xlab("Country") ## x & y axis labels
+gg<-gg+theme(axis.text.x = element_text(angle = 60, hjust = 1))
+gg<-gg+ggtitle("References to Country in Times Dataset") ## Chart Title
+gg
+```
+
+#### *Shanghai Dataset*
+
+```{r National Ranking Data from Shanghai dataset}
+##shows the number of times each country is referenced in the Shanghai dataset
+shanghaiData%>%
+  count(national_rank)%>%
+  arrange(-n)
+```
+
+```{r Histogram of country references in Shanghai dataset}
+gg<-ggplot(shanghaiData,aes(x=national_rank))
+gg<-gg+geom_histogram(stat="count",binwidth = 20,fill="darkgreen")
+
+gg<-gg+ylab("Count")+xlab("National_Rank") ## x & y axis labels
+gg<-gg+theme(axis.text.x = element_text(angle = 60, hjust = 1))
+gg<-gg+ggtitle("References to Country in Shanghai Dataset") ## Chart Title
+gg
+```
+
+
+
+
+## **References**
+Grolemund, G., & Wickham, H. (2017). R for Data Science (1st ed.). Sebastopol, CA: O’Rielly Media Inc. Retrieved from https://r4ds.had.co.nz/
+
+Methodology | CWUR | Center for World University Rankings. (2012). Retrieved May 20, 2019, from https://cwur.org/methodology/world-university-rankings.php
+
+Ranking Methodology of Academic Ranking of World Universities. (2015). Retrieved May 20, 2019, from http://www.shanghairanking.com/ARWU-Methodology-2015.html
+
+World University Rankings 2015-2016 methodology. (2015). Retrieved May 20, 2019, from https://www.timeshighereducation.com/news/ranking-methodology-2016
+
+World University Rankings DataSet. (2016). Retrieved May 20, 2019, from https://www.kaggle.com/mylesoneill/world-university-rankings
