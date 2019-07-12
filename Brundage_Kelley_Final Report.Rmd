@@ -1,0 +1,1533 @@
+---
+title: "LLO 8200: Data Science Final Project - BrundageK"
+author: "Kelley Brundage"
+date: "7/2/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, error=FALSE}
+##This code allows the Knit function to still work even with errors 
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, results ='hide',include=TRUE,messages=FALSE)
+
+#We always start with a standard set of setup commands by loading the correct libraries. 
+
+##Load libraries in order to successfully run the code below - the suppressMessages coding will stop the install.packages information, etc.. from coming up in the Console and showing you what has run.
+
+suppressMessages(library(caret)) #Misc functions for training and plotting classification and regression models.
+suppressMessages(library(dplyr)) #able to select, filter, organize, and manipulate data stored within an R data frame
+suppressMessages(library(evaluate)) #Parsing and Evaluation Tools that Provide More Details than the Default
+suppressMessages(library(forcats)) #Tools for Working with Categorical Variables (Factors)
+suppressMessages(library(formatR)) #Provides a function tidy_source() to format R source code.
+suppressMessages(library(ggplot2)) #A system for 'declaratively' creating graphics, based on "The Grammar of Graphics".
+suppressMessages(library(haven)) #Import foreign statistical formats into R via the embedded 'ReadStat' C library
+suppressMessages(library(knitr))#General-Purpose Package for Dynamic Report Generation in R 
+  opts_chunk$set(comment = NA)
+  def_hook <- knit_hooks$get("output")
+  knit_hooks$set(output = function(x, options)
+    {out <- def_hook(x, options)
+    return(paste("\\begin{framed}\\begin{verbatim}", x, "\\end{verbatim}\\end{framed}",
+                 collapse = "\n"))})
+
+suppressMessages(library(lubridate)) #Functions to work with date-times and time-spans: fast and user friendly parsing of date-time data, extraction and updating of components of a date-time
+suppressMessages(library(ModelMetrics)) #Collection of metrics for evaluating models written in C++ using 'Rcpp'.
+suppressMessages(library(modelr)) #Functions for modelling that help you seamlessly integrate modelling into a pipeline of data manipulation and visualisation.
+suppressMessages(library(pander))#provide a minimal and easy tool for rendering R objects
+  panderOptions('table.style', "multiline")
+  panderOptions('table.alignment.default',function(df)ifelse(sapply(as.data.frame(df),
+                                                            is.numeric),'right','left'))
+
+suppressMessages(library(readxl)) #reads in Excel Files
+suppressMessages(library(rvest)) #scraping websites
+suppressMessages(library(tibble)) #Provides a 'tbl_df' class (the 'tibble') that provides stricter checking and better formatting than the traditional data frame.
+suppressMessages(library(tidyverse)) #set of packages that work in harmony because they share common data representations and 'API' design
+
+##Define My PDF setup - This code does not show in the final document but will assist with definining the margin cutoff point and wraps the text to the next line.
+knitr::opts_chunk$set(fig.path = "Figs/", results='hide', tidy.opts=list(width.cutoff=60)) 
+
+  my_pdf = function(file,width,height)
+  {pdf(file, width=width, height=height,pointsize=12)}
+
+##The code below will upload the World University Ranking Datasets obtained from Kaggle.com
+
+##The next set of files are the three World Ranking system files
+library(readxl)
+cwur <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/cwurData.xlsx")
+
+save(cwur, file = "cwurData.xlsx") #save as excel file name cwurData.xlsx
+
+library(readxl)
+shanghai <- read_csv("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/shanghaiData.csv")
+
+save(shanghai, file = "shanghaiData.csv") #save as csv file name shanghaiData.csv
+
+library(readxl)
+times <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/timesData.xlsx")
+
+save(times, file = "timesData.xlsx") #save as excel file name timesData.xlsx
+
+##The three datasets below are the additional datasets provided that connect to the World University Ranking datasets
+library(readxl)
+education_expenditure_supplementary_data <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/education_expenditure_supplementary_data.xlsx")
+
+library(readxl)
+educational_attainment_supplementary_data <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/educational_attainment_supplementary_data.xlsx")
+
+##The file below lists the name of the institution and the Country the institution is located in
+library(readxl)
+school_and_country_table <- read_excel("~/School/EdD program - Vanderbilt/01 - Classes/LLO 8200 - Intro to Data Science/Final Project/datafiles/school_and_country_table.xlsx")
+
+```
+
+```{r Convert Numeric Columns for all Datasets}
+#the code below will show us the type of data coded in each column on each dataset
+sapply(cwur,class)
+
+sapply(times,class)
+
+sapply(shanghai,class)
+
+#the code above showed us an issue with the times and shanghai dataset so the code below will convert the data type for the times dataset 
+
+snames <- c(1,4:12)
+shanghai[,snames] <- lapply(shanghai[snames], as.numeric)
+
+sname <- c(2:3)
+shanghai[,sname] <- lapply(shanghai[sname], as.character)
+str(shanghai)
+
+tnames <- c(1,4:14)
+times[,tnames] <- lapply(times[tnames], as.numeric)
+
+tname <- c(2:3)
+times[,tname] <- lapply(times[tname], as.character)
+
+str(times)
+```
+
+
+```{r CWUR Data Column labels}
+
+## This code will clean up the column labels to align directly with the variable definitions for the columns as well as rename the columns into a readable format that describes the column data.
+
+names(cwur)<-c("World Rank",
+                "Instiution Name",
+                "Country",
+                "National Rank",
+                "Quality of Education",
+                "Alumni Employment",
+                "Quality of Faculty",
+                "Publications",
+                "Influence",
+                "Citations",
+                "Broad Impact",
+                "Patents",
+                "Score",
+                "Year")
+
+head(cwur)
+```
+
+```{r Shanghai Data Column labels}
+
+## This code will clean up the column labels to align directly with the variable definitions for the columns as well as rename the columns into a readable format that describes the column data.
+
+names(shanghai)<-c("World Rank",
+                "University Name",
+                "Country",
+                "National Rank",
+                "Total Score",
+                "Alumni",
+                "Award",
+                "Highly Cited Researchers",
+                "Nature & Science Pubs",
+                "Publications",
+                "Per Capita Performance",
+                "Year")
+
+head(shanghai)
+```
+
+```{r Times Data Column labels}
+
+## This code will clean up the column labels to align directly with the variable definitions for the columns as well as rename the columns into a readable format that describes the column data.
+
+names(times)<-c("World Rank",
+                "University Name",
+                "Country",
+                "Teaching",
+                "International",
+                "Research",
+                "Citations",
+                "Income",
+                "Total Score",
+                "Number of Students",
+                "Student/Staff Ratio",
+                "International Students",
+                "Female/Male Ratio",
+                "Year")
+
+head(times)
+```
+
+#### *CWUR Dataset*
+
+```{r CWUR Reorder World Rank column }
+##Only reflect the top 10 institutions listed by World Rank in the CWUR Dataset
+cwurten <- cwur[order(cwur$`World Rank`),]
+
+head(cwurten)
+```
+
+```{r CWUR Top Ten by World Rank}
+cwurtt <- cwurten[1:40,]
+
+head(cwurten)
+```
+
+```{r Country Data from CWUR dataset}
+##shows the number of times each country is referenced in the cwur dataset
+ccount <- cwur%>%
+  count(Country)%>%
+  arrange(-n)
+
+head(ccount)
+```
+
+The table below reflects the total number of times each country in the CWUR dataset is referenced.
+```{r print CWUR Count by Country}
+
+colnames(ccount) <- c("Country", "Total References")
+
+print(kable(ccount,
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:3))
+```
+
+#### *Times Dataset*
+```{r Times Reorder World Rank column }
+##Only reflect the top 10 institutions listed by World Rank in the CWUR Dataset
+
+timesten <- times[order(times$`World Rank`),]
+
+
+head(timesten)
+```
+
+```{r Times Top Ten by World Rank}
+timestt <- timesten[1:60,]
+
+head(timesten)
+```
+
+
+```{r Country Data from Times dataset}
+##shows the number of times each country is referenced in the cwur dataset
+tcount <- times%>%
+  count(Country)%>%
+  arrange(-n)
+
+head(tcount)
+```
+
+The table below reflects the total number of times each country in the Times dataset is referenced.
+```{r print Times Count by Country}
+
+colnames(tcount) <- c("Country", "Total References")
+
+print(kable(tcount,
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:3))
+```
+
+
+#### *Shanghai Dataset*
+
+```{r Shanghai Reorder World Rank column }
+##Only reflect the top 10 institutions listed by World Rank in the CWUR Dataset
+shangten <- shanghai[order(shanghai$`World Rank`),]
+
+head(shangten)
+```
+
+```{r Shanghai Top Ten by World Rank}
+shangtt <- shangten[1:110,]
+
+head(shangten)
+```
+
+```{r Country Data from Shanghai dataset}
+##shows the number of times each country is referenced in the cwur dataset
+scount <- shanghai%>%
+  count(Country)%>%
+  arrange(-n)
+
+head(scount)
+```
+
+The table below reflects the total number of times each country in the Shanghai dataset is referenced.
+```{r print Shanghai Count by Country}
+
+colnames(scount) <- c("Country", "Total References")
+
+print(kable(scount,
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:3))
+```
+
+```{r Tidy Principles - Data Clean up}
+
+#The code below will apply some baseline Tidy-Data principles which will allow future use of the clean data.
+
+#1. Each variable forms a column
+#2. Each observation forms a row
+#3. Each type of observational units forms a table
+
+is.data.frame(cwur)
+is.tibble(cwur)
+is_tibble(cwur)
+typeof(cwur)
+
+is.data.frame(shanghai)
+is.tibble(shanghai)
+is_tibble(shanghai)
+typeof(shanghai)
+
+is.data.frame(times)
+is.tibble(times)
+is_tibble(times)
+typeof(times)
+
+```
+
+
+# Final Report: World University Rankings
+
+## **Introduction**
+Ranking universities is very challenging and comes with a variety of political and controversial practices.  Throughout the world, there are hundreds of different national and international university ranking systems, many that disagree with each other.  
+
+Fortunately, there are a series of public resources available that provide ranking data of this nature.  Specifically, I have chosen the World University Ranking dataset provided on Kaggle.com as these files contain three global university rankings from various places throughout the world.
+
+Having the ability to identify and understand how hundreds of institutions throughout the world compare to each other is vital to ensuring accuracy and acceptability.  Nevertheless, ranking systems continue to be famous for what they have been doing over the decades, highlighting who is the best of the best in the global context.  
+  
+## *Introduce Problem and Approach*
+I intend to compare the three global ranking systems to the amount of faculty, publications/research at each institution per ranking system by approaching each dataset with an analytical and statistical viewpoint. 
+
+I am analyzing the dataset specific to the area of research/academic and if common challenges that exist with all ranking systems exist.  Problems such as making the correction for institutional size, differences between average and extreme, defining the institutions, measurement of time frame, credit allocation, excellency factors as well as adjustment for scientific fields or types of research.
+
+# **Data**
+
+## *How was the data acquired?*
+Kaggle.com Dataset file: World University Rankings
+website: https://www.kaggle.com/mylesoneill/world-university-rankings
+
+## *Format of Data*
+
+There are a total of six files (.csv) that make up this data set containing three ranking systems: Times Higher Education World University Ranking; Academic Ranking of World Universities (Shanghai Ranking) and The Center for World University Rankings.
+
+### **University Ranking Data**
+
+The *Times Higher Education World University Ranking* is widely regarded as one of the most influential and widely observed university measures. Founded in the United Kingdom in 2010, it has been criticized for its commercialization and for undermining non-English-instructing institutions.
+
+The *Academic Ranking of World Universities*, also known as the *Shanghai Ranking*, is an equally influential ranking. It was founded in China in 2003 and has been criticized for focusing on raw research power and for undermining humanities and quality of instruction.
+
+The *Center for World University Rankings* is a less well know listing that comes from Saudi Arabia, founded in 2012.
+
+    1. How do these rankings compare to each other?
+    2. Are the various criticisms levied against these rankings fair or not?
+    3. How does your alma mater fare against the world?
+
+### **Supplementary Data**
+
+To further extend the analyses, there are two additional sets of supplementary data.
+
+The first of these is a set of data on **educational attainment** around the world. It comes from The World Data Bank and comprises information from the UNESCO Institute for Statistics and the Barro-Lee Dataset. 
+
+The second supplementary dataset contains information about **public and private direct expenditure on education across nations**. This data comes from the National Center for Education Statistics. It represents expenditure as a percentage of gross domestic product. 
+
+## **Describe data/Variables**
+
+### *Center for World University Rankins Methodology*
+Publishes the only global university ranking that measures the quality of education and training of students as well as the prestige of the faculty members and the quality of their research without relying on surveys and university data submissions.
+
+CWUR uses seven objective and robust indicators to rank the worlds top 1000 universities:
+    1. Quality of Education, measured by the number of a 
+        university's alumni who have won major international 
+        awards, prizes, and medals relative to the 
+        university's size (15%) 
+    2. Alumni Employment, measured by the number of a 
+        university's alumni who have held CEO positions at 
+        the world's top companies relative to the 
+        university's size (15%) 
+    3. Quality of Faculty, measured by the number of 
+        academics who have won major international awards, 
+        prizes, and medals (15%) 
+    4. Research Output, measured by the total number of 
+        research papers (15%) 
+    5. Quality Publications, measured by the number of 
+        research papers appearing in top-tier journals (15%) 
+    6. Influence, measured by the number of research papers 
+        appearing in highly-influential journals (15%) 
+    7. Citations, measured by the number of highly-cited 
+        research papers (10%)
+
+### *ARWU/Shanghai Methodology*
+ARWU considers every university that has any Nobel Laureates, Fields Medalists, Highly Cited Researchers, or papers published in Nature or Science. Also, universities with a significant amount of papers indexed by Science Citation Index-Expanded (SCIE) and Social Science Citation Index (SSCI) are included. In total, more than 1200 universities are ranked, and the best 500 are published on the web.
+
+Universities are ranked by several indicators of academic or research performance, including alumni and staff winning Nobel Prizes and Fields Medals, highly cited researchers, papers published in Nature and Science, papers indexed in major citation indices, and the per capita academic performance of an institution. For each indicator, the highest scoring institution is assigned a score of 100, and other institutions are calculated as a percentage of the top score. The distribution of data for each indicator is examined for any significant distorting effect; standard statistical techniques are used to adjust the indicator if necessary. Scores for each indicator are weighted as shown below to arrive at a final overall score for an institution. The highest scoring institution is assigned a score of 100, and other institutions are calculated as a percentage of the top score. An institution's rank reflects the number of institutions that sit above it.
+
+### *Times Dataset Methodology*
+Only global performance tables that judge research-intensive universities across all their core missions: teaching, research, knowledge transfer and international outlook. We use 13 carefully calibrated performance indicators to provide the most comprehensive and balanced comparisons, trusted by students, academics, university leaders, industry, and even governments. The basic methodology for this year’s rankings is similar to that employed since the 2011-12 tables, but we have made important changes to the underlying data.
+
+The performance indicators are grouped into five areas:
+
+    Teaching (the learning environment)
+    Research (volume, income, and reputation)
+    Citations (research influence)
+    International outlook (staff, students, and research)
+    Industry income (knowledge transfer).
+
+## **Supporting Displays/Visualizations**
+
+### *Visualizations by the three ranking datasets*
+The data visualizations below are current placeholders and are not representative yet of the indented problem that has been introduced at the beginning of this document.  
+
+#### *CWUR Dataset*
+
+```{r CWUR Reorder World Rank column }
+##Only reflect the top 10 institutions listed by World Rank in the CWUR Dataset
+cwurten <- cwur[order(cwur$`World Rank`),]
+
+head(cwurten)
+```
+
+```{r CWUR Top Ten by World Rank}
+cwurtt <- cwurten[1:40,]
+
+head(cwurten)
+```
+
+
+```{r Country Data from CWUR dataset}
+##shows the number of times each country is referenced in the cwur dataset
+ccount <- cwur%>%
+  count(Country)%>%
+  arrange(-n)
+
+head(ccount)
+```
+
+```{r Histogram of country references in CWURten dataset, results="asis"}
+ggten<-ggplot(cwurten,aes(x=Country))+
+  geom_histogram(stat = "count",binwidth = 20,fill="darkgreen")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title ="References to Country in CWUR Dataset", x="Country", y="Count" )
+ggten
+```
+
+```{r Histogram of Countries in CWUR Top Ten, results="asis" }
+ggtt <- ggplot(cwurtt,aes(x=Country))+
+  geom_histogram(stat="count",binwidth = 20,fill="darkblue")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title="Countries in Top Ten for World Rank in CWUR dataset", x="Country", y="Count")
+ggtt
+```
+
+
+```{r Group and Arrange CWUR data}
+cwur%>%
+  group_by(`World Rank`)%>%
+  summarize(Country=n_distinct(Country))%>%
+  arrange(desc(Country))
+```
+
+#### *Times Dataset*
+
+```{r Times Reorder World Rank column }
+##Only reflect the top 10 institutions listed by World Rank in the CWUR Dataset
+
+timesten <- times[order(times$`World Rank`),]
+
+
+head(timesten)
+```
+
+```{r Times Top Ten by World Rank}
+timestt <- timesten[1:60,]
+
+head(timesten)
+```
+
+```{r Country Data from Times dataset}
+##shows the number of times each country is referenced in the cwur dataset
+tcount <- times%>%
+  count(Country)%>%
+  arrange(-n)
+
+head(tcount)
+```
+
+```{r Histogram of country references in Times dataset, results="asis"}
+ggtten<-ggplot(timesten,aes(x=Country))+
+  geom_histogram(stat = "count",binwidth = 20,fill="darkgreen")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title ="References to Country in Times Dataset", x="Country", y="Count" )
+ggtten
+```
+
+```{r Histogram of Countries in Times Top Ten, results="asis"}
+ggttt <- ggplot(timestt,aes(x=Country))+
+  geom_histogram(stat="count",binwidth = 20,fill="darkblue")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title="Countries in Top Ten for World Rank in Times dataset", x="Country", y="Count")
+ggttt
+```
+
+
+```{r Group and Arrange Times data}
+timesten%>%
+  group_by(`World Rank`)%>%
+  summarize(Country=n_distinct(Country))%>%
+  arrange(Country)
+```
+
+#### *Shanghai Dataset*
+
+```{r Shanghai Reorder World Rank column }
+##Only reflect the top 10 institutions listed by World Rank in the CWUR Dataset
+shangten <- shanghai[order(shanghai$`World Rank`),]
+
+head(shangten)
+```
+
+```{r Shanghai Top Ten by World Rank}
+shangtt <- shangten[1:110,]
+
+head(shangten)
+```
+
+
+```{r Country Data from Shanghai dataset}
+##shows the number of times each country is referenced in the cwur dataset
+scount <- shanghai%>%
+  count(Country)%>%
+  arrange(-n)
+
+head(scount)
+```
+
+```{r Histogram of country references in Shanghai dataset, results="asis"}
+
+ggsten<-ggplot(shangten,aes(x=Country))+
+  geom_histogram(stat = "count",binwidth = 20,fill="darkgreen")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title ="References to Country in CWUR Dataset", x="Country", y="Count" )
+ggsten
+```
+
+```{r Histogram of Countries in Shanghai Top Ten, results="asis"}
+
+ggstt <- ggplot(shangtt,aes(x=Country))+
+  geom_histogram(stat="count",binwidth = 20,fill="darkblue")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  labs(title="Countries in Top Ten for World Rank in Shanghai dataset", x="Country", y="Count")
+ggstt
+```
+
+
+```{r Group and Arrange Shanghai data}
+shanghai%>%
+  group_by(`World Rank`)%>%
+  summarize(Country=n_distinct(Country))%>%
+  arrange(desc(Country))
+```
+
+# *Exploratory Data Analysis*
+
+
+## *Columns in each dataset that will be used to compare and analysze the ranking system*
+
+CWUR Dataset Fields:
+world_rank; institution; country; national_rank; publications; citations
+
+    Publications (measured by # of papers in top-tier journals - 15%)
+    Citations
+
+Shanghai Dataset Fields:
+     word_rank; university_name; national_rank; pub; hici
+     
+     Pub (Publications)
+     HICI (Highly Cited Researchers)
+     
+     Merged School and Country data into this file by adding a new column after University Name that indicates the Country.
+
+Times Dataset Fields:
+     world_rank; university; country; research; citations
+     
+     Research (volume, income, and reputation)
+     Citations (research influence)
+
+## **Extensive Investigation of Dataset**
+
+Investigate data: distribution of data, correlations, associations, and predictive potential to solve your proposed problem:
+
+Continued review and analysis of the datasets has led me to identify a series of common fields within the three primary ranking system datasets: CWUR, Shanghai and Times.  All three hold common columns such as the World Rank, Institution/University Name, Publications/Research and Citations.  My analysis will expand to look at both the research and citations between the three ranking systems as well as to compare the countries that appear in each dataset depending on the references within the datasets.
+
+
+##*Data Analysis*
+Below are the means of the overall publications/citations for the three global ranking systems.  For all three datasets; CWUR, Shanghai and Times an average 50 publications and citations are produced per institution.
+
+### Regression Data for CWUR - Publications
+
+```{r CWUR Publications Mean}
+
+cwurp_mean <- cwurten%>%summarise(mean(Publications,na.rm = T))
+
+print(summary(cwurp_mean), show_level=T)
+  #na.rm=T specifies what to do with any missing data in the dataset
+```
+
+```{r CWUR Publications % Min to Med to Max}
+
+cwurten <- cwurten%>%mutate(publications_p=percent_rank(cwurten$Publications)*100)
+  #default would give 0-1 so *by 100 and it will make it easier to understand the publication number in the CWUR dataset
+
+cwurpp_mean <- cwurten%>%summarise(mean(publications_p,na.rm = T))
+
+print(summary(cwurp_mean))
+  #gives the mean of the publications in the CWUR dataset
+```
+
+```{r CWUR Publications Mean to SD to Max & Min}
+#The code below shows Publications by Country in the CWUR dataset showing the mean, standard deviation, max and min.
+
+desc_cwur <- cwurten%>%
+  group_by(Country)%>%
+  summarise(mean_pub = mean(publications_p),
+            sd_pub = sd(publications_p),
+            max_pub= max(publications_p),
+            min_pub= min(publications_p))
+```
+
+```{r CWUR Publications Min to Max Summary}
+#The code below shows which country has the maximum and minimum Publications inthe CWUR dataset
+
+desc_cwur%>%
+  filter(max(mean_pub) == mean_pub)
+
+desc_cwur%>%
+  filter(min(mean_pub) == mean_pub)
+
+print(summary(desc_cwur))
+```
+
+
+Results for CWUR Publications:
+
+Average Publications in CWUR dataset: 460
+Average Publications by percent rank in CWUR dataset: 50
+Publications by Country in the CWUR dataset showing the mean, standard deviation, max and min.
+Filter showing the Country with the Maximum average publications: Puerto Rico
+Filter showing the Country with the Minimum average publications: Singapore
+
+### Regression Data for CWUR - Citations
+
+```{r CWUR Citations Mean}
+
+cwurc_mean <- cwurten%>%summarise(mean(cwurten$Citations,na.rm = T))
+
+print(summary(cwurc_mean))
+  #na.rm=T specifies what to do with any missing data in the dataset
+```
+
+```{r CWUR Citations % Min to Med to Max}
+
+cwurten <- cwurten%>%mutate(citations_p=percent_rank(cwurten$Citations)*100)
+  #default would give 0-1 so *by 100 and it will make it easier to understand the publication number in the CWUR dataset
+
+cwurcp_mean <- cwurten%>%summarise(mean(citations_p,na.rm = T))
+
+print(summary(cwurcp_mean))
+  #gives the mean of the publications in the CWUR dataset
+```
+
+```{r CWUR Citations Mean to SD to Max & Min}
+#The code below shows Citations by Country in the CWUR dataset showing the mean, standard deviation, max and min.
+
+desc_cwur <- cwurten%>%
+  group_by(Country)%>%
+  summarise(mean_cit = mean(Citations),
+            sd_cit = sd(Citations),
+            max_cit= max(Citations),
+            min_cit= min(Citations))
+```
+
+```{r CWUR Citations Min to Max Summary}
+#The code below shows which country has the maximum and minimum Citations inthe CWUR dataset
+
+desc_cwur%>%
+  filter(max(mean_cit) == mean_cit)
+
+desc_cwur%>%
+  filter(min(mean_cit) == mean_cit)
+
+print(summary(desc_cwur))
+```
+
+
+Results for CWUR Citations:
+
+Average Citations in CWUR dataset: 413
+Average Citations by percent rank in CWUR dataset:48
+Citations by Country in the CWUR dataset showing the mean, standard deviation, max and min.
+Filter showing the Country with the Maximum average citations: Lebanon, United Arab Emirates, Uruguay
+Filter showing the Country with the Minimum average citations: Singapore
+
+### Regression Data for Shanghai - Publications
+
+```{r Shanghai Publication Mean}
+spub_mean <- shangten%>%summarise(mean(shangten$Publications,na.rm = T))
+
+print(summary(spub_mean))
+  #na.rm=T specifies what to do with any missing data in the dataset
+```
+
+```{r Publication % Min to Med to Max}
+shangten <- shangten%>%mutate(publications_p=percent_rank(shangten$Publications)*100)
+  #default would give 0-1 so *by 100 and it will make it easier to understand the publication number in the Shanghai dataset
+
+spubp_mean <- shangten%>%summarise(mean(publications_p,na.rm = T))
+
+print(summary(spubp_mean))
+  #gives the mean of the publications in the Shanghai dataset
+```
+
+```{r Shanghai Publications Mean to SD to Max $ Min}
+#The code below shows Citations by National Rank in the Shanghai dataset showing the mean, standard deviation, max and min.
+
+desc_shanghai <- shangten%>%
+  group_by(Country)%>%
+  summarise(mean_spub=mean(Publications),
+            sd_spub=sd(Publications),
+            max_spub=max(Publications),
+            min_spub=min(Publications))
+```
+
+```{r Shanghai Min to Max Summary}
+#The code below shows which country has the maximum and minimum Publications in the Shanghai dataset
+
+#Max Publications
+desc_shanghai%>%
+  filter(max(mean_spub)==mean_spub)
+
+#Min Publications
+desc_shanghai%>%
+  filter(min(mean_spub)==mean_spub)
+
+print(summary(desc_shanghai))
+```
+
+
+Results for Shanghai Publications:
+
+Average Publications in Shanghai dataset: 38.25
+Average Publications by percent rank in Shanghai dataset:50
+Publications by Country in the Shanghai dataset showing the mean, standard deviation, max and min.
+Filter showing the Country with the Maximum average publications: 
+Filter showing the Country with the Minimum average publications: 
+
+### Regression Data for Shanghai - HICI/Citations
+
+```{r Shanghai HICI/Citation Mean}
+
+shici_mean <- shangten%>%summarise(mean(shangten$`Highly Cited Researchers`,na.rm = T))
+
+print(summary(shici_mean))
+  #na.rm=T specifies what to do with any missing data in the dataset
+```
+
+
+```{r Shanghai HICI/Citation % Min to Med to Max}
+
+shangten <- shangten%>%mutate(hici_p=percent_rank(shangten$`Highly Cited Researchers`)*100)
+  #default would give 0-1 so *by 100 and it will make it easier to understand the publication number in the Shanghai dataset
+
+shicip_mean <- shangten%>%summarise(mean(hici_p,na.rm = T))
+
+print(summary(shicip_mean))
+  #gives the mean of the publications in the Shanghai dataset
+```
+
+
+```{r Shanghai HICI/Citation Mean to SD to Max & Min}
+
+#The code below shows Citations by Country in the Shanghai dataset showing the mean, standard deviation, max and min.
+
+desc_shanghai <- shangten%>%
+  group_by(Country)%>%
+  summarise(mean_spub=mean(`Highly Cited Researchers`),
+            sd_spub=sd(`Highly Cited Researchers`),
+            max_spub=max(`Highly Cited Researchers`),
+            min_spub=min(`Highly Cited Researchers`))
+```
+
+```{r Shanghai Min to Max Summary}
+#The code below shows which country has the maximum and minimum HICI/Citations in the Shanghai dataset
+
+desc_shanghai%>%
+  filter(max(mean_spub) == mean_spub)
+
+desc_shanghai%>%
+  filter(min(mean_spub) == mean_spub)
+
+print(summary(desc_shanghai))
+```
+
+
+Results for Shanghai HICI/Citations:
+
+Average HICI/Citations in Shanghai dataset: 16.22
+Average HICI/Citations by percent rank in Shanghai dataset:48
+HICI/Citations by Country in the Shanghai dataset showing the mean, standard deviation, max and min.
+Filter showing the Country with the Maximum average citations: 
+Filter showing the Country with the Minimum average citations: 
+
+### Regression Data for Times - Research/Publications
+
+```{r Times Research/Publication Mean}
+
+timesr_mean <- timesten%>%summarise(mean(Research,na.rm = T))
+
+print(summary(timesr_mean))
+  #na.rm=T specifies what to do with any missing data in the dataset
+```
+
+```{r Times Research/Publication % Min to Med to Max}
+
+timesten <- timesten%>%mutate(research_p=percent_rank(timesten$Research)*100)
+  #default would give 0-1 so *by 100 and it will make it easier to understand the publication number in the Times dataset
+
+timesrp_mean <- timesten%>%summarise(mean(research_p,na.rm = T))
+
+print(summary(timesrp_mean))
+  #gives the mean of the publications in the Times dataset
+```
+
+```{r Times Research/Publication Mean to SD to Max & Min}
+#The code below shows Publications/Research by Country in the Times dataset showing the mean, standard deviation, max and min.
+
+desc_times <- timesten%>%
+  group_by(Country)%>%
+  summarise(mean_tpub = mean(Research),
+            sd_tpub = sd(Research),
+            max_tpub= max(Research),
+            min_tpub= min(Research))
+```
+
+```{r Times Min to Max Summary}
+#The code below shows which country has the maximum and minimum Publications/Research in the Times dataset
+
+desc_times%>%
+  filter(max(mean_tpub) == mean_tpub)
+
+desc_times%>%
+  filter(min(mean_tpub) == mean_tpub)
+
+print(summary(desc_times))
+```
+
+
+Results for Times Publications:
+
+Average Publications in Times dataset: 35.91
+Average Publicatinos by percent rank in Times dataset:50
+Publications by Country in the Times dataset showing the mean, standard deviation, max and min.
+Filter showing the Country with the Maximum average publications: Singapore
+Filter showing the Country with the Minimum average publications: Morocoo
+
+### Regression Data for Times - Citations
+
+```{r Times Citations Mean}
+
+timesc_mean <- timesten%>%summarise(mean(Citations,na.rm = T))
+
+print(summary(timesc_mean))
+  #na.rm=T specifies what to do with any missing data in the dataset
+```
+
+```{r Times Citations % Min to Med to Max}
+
+timesten <- timesten%>%mutate(citations_p=percent_rank(Citations)*100)
+  #default would give 0-1 so *by 100 and it will make it easier to understand the citations number in the Times dataset
+
+timescp_mean <- timesten%>%summarise(mean(citations_p,na.rm = T))
+
+print(summary(timescp_mean))
+  #gives the mean of the publications in the Times dataset
+```
+
+```{r Times Research/Publication Mean to SD to Max & Min}
+#The code below shows Publications/Research by Country in the Times dataset showing the mean, standard deviation, max and min.
+
+desc_times <- timesten%>%
+  group_by(Country)%>%
+  summarise(mean_tcit = mean(Citations),
+            sd_tcit = sd(Citations),
+            max_tcit= max(Citations),
+            min_tcit= min(Citations))
+```
+
+```{r Times Min to Max Summary}
+#The code below shows which country has the maximum and minimum Publications/Research in the Times dataset
+
+desc_times%>%
+  filter(max(mean_tcit) == mean_tcit)
+
+desc_times%>%
+  filter(min(mean_tcit) == mean_tcit)
+
+print(summary(desc_times))
+```
+
+
+
+Results for Times Publications:
+
+Average Publications in Times dataset: 35.91
+Average Publicatinos by percent rank in Times dataset:50
+Publications by Country in the Times dataset showing the mean, standard deviation, max and min.
+Filter showing the Country with the Maximum average publications: Luxembourg
+Filter showing the Country with the Minimum average publications: Ukraine
+
+##Summary of Regression Data Above
+
+```{r Summary of three ranking systems regression data}
+
+#The code below provides a table view for each of the regression data calculations done above for the three world ranking datasets: CWUR, Shanghai and Times
+
+cwurp_mean
+cwurpp_mean
+cwurc_mean
+cwurcp_mean
+print(desc_cwur)
+
+spub_mean
+spubp_mean
+shici_mean
+shicip_mean
+print(desc_shanghai)
+
+timesr_mean
+timesrp_mean
+timesc_mean
+timescp_mean
+pring(desc_times)
+```
+
+## *Visuals: Density Plots & Scatterplots*
+
+Below are a baseline set of Density plots that show the regression data for overall publications and citations within the three world ranking datasets.
+
+```{r Density Plot of Citations in CWUR Dataset, results="asis"}
+
+gc1 <- ggplot(cwurten,aes(Citations))+
+  geom_density(binwidth=1, fill="lightblue")+ #Density is the Chart Shape
+  theme(axis.text.x=element_text(angle=60, hjust=1))+
+  labs(title="Citations in CWUR in Top Ten Dataset", x="Citations", y="Count") #chart labels
+
+print(gc1)
+```
+
+Density Plot #1: Citations in CWUR Daset
+The plot above shows the level of citations referenced within the CWUR dataset.  This chart reflects that the mid-way of 400 citations appears to be the average with two outlier areas of a low point between 0-100 citations and a high point between 700-800 citations.
+
+```{r Density Plot of Citations in Shanghai Dataset, results="asis"}
+
+gs1 <- ggplot(shangten, aes(x=shangten$`Highly Cited Researchers`))+
+  geom_density(binwidth=1, fill="lightgreen")+ #Density is the Chart Shape
+  theme(axis.text.x=element_text(angle=60, hjust=1))+
+  labs(title="Citations in Shanghai in Top Ten Dataset", x="Citations", y="Count") # chart labels
+
+print(gs1)
+```
+
+Density Plot #2: Citations in Shanghai Daset
+The plot above shows the level of citations referenced within the Shanghai dataset.  You will notice that the peak of citations within this dataset is on average 10-12 or a little under the mid-way mark between 0-25 citations.
+
+```{r Density Plot of Citations in Times Dataset, results="asis"}
+
+gt1 <- ggplot(timesten, aes(x=Citations))+ 
+  geom_density(binwidth=1, fill="lightyellow")+ #Density is the Chart Shape
+  theme(axis.text.x=element_text(angle=60, hjust=1))+
+  labs(title="Citations in Times Top Ten Dataset", x="Citations", y="Count") #labels
+
+print(gt1)
+```
+
+**Density Plot #3: Citations in Times Daset**
+The plot above shows the level of citations referenced within the Times dataset.  You will notice that the average or peak for the citations is at the middle mark between 50-75 citations, approximately 62.5 citations.
+
+##*World Rankings Dataset Predictions*
+
+The data and charts below show the pulication/citation predictions based on the three world datasets.
+
+## *CWUR Dataset Prediction*
+
+### Publications
+```{r CWUR Publications Prediction}
+
+cpub1<-lm(Publications~Citations,data=cwurten) 
+  #publications ~(as a function of) citations, data=dataset(cwurten)
+
+#outcome (publications) on left, predictor (citations) on right 
+
+print(summary(cpub1))#shows the results of the regression
+```
+
+**RESULTS:**
+F-test = 4864       dfn=1  dfd=2196       fcv=3.84
+2196>3.84 so we reject the Ho
+
+p-value = 2.2e-16 > .5 so we fail to reject the Ho
+R-squared: .69
+
+A simple linear regression analysis shows that the activity for publicatinos can be significantly predicted based on the citations produced, F(1,2196)=3.84, p>.05, R2 = .69
+
+If the Citations for the CWUR Dataset is 0 then the intercept(publications) are predicted to be 65.68 (Est. Std). As citations increases within the CWUR Dataset (every 1 unit change) publications are predicted to increase by .95 points (Est. Std)
+
+Residual Standard Error (RMSE): 169.5 on df(2198)
+
+### Citations
+```{r Point Plot of CWUR Publications by Citations, results="asis"}
+#The graph/plot below is pulling from the top ten dataset - cwurten in order to present the best point plot
+
+gc2 <- ggplot(cwurten, aes(x=Citations, y=Publications))+
+  geom_point(shape=3, alpha=.5, size=.5)+
+  geom_smooth(method="lm")+
+  geom_smooth(method="loess", color="red")+
+  geom_smooth(color="grey")+
+  labs(title="Regression Lines: # of Publications by Citations made in CWUR Top Ten Dataset", x="Publications", y="Citations")
+print(gc2)
+
+##lm puts a straight line through the publication data points and is similiar to a best line fit.
+##LOESS fits a curve through the publication data points and is similar to modeling with calculus as it is the weighted sum of squared erros and may accurately account for the range within the dataset.
+```
+
+The scatterplot above with the Linear and LOESS regression lines is showing a positive relationship between the number of Citations and the number of Publications produced in the CWUR Top Ten dataset.
+
+## RMSE for CWUR Publications
+Based on the data below the Root Mean Squared Error for the CWUR prediction data for publications is 169.43, which means on average we are off by 169.
+
+```{r RMSE for CWUR publications}
+#The code below runs the root mean squared error number from a validation of the model data above
+
+cwurten<- cwurten%>%add_predictions(cpub1)%>%rename(predc1=pred)
+  #predict using data in memory
+  
+rmse_cpub1<-modelr::rmse(cpub1,cwurten);rmse_cpub1
+print(summary(rmse_cpub1))
+  #shows the root mean squared average for the CWUR publication dataset prediction
+```
+
+The Root Mean Squared Error (RMSE) from the validation of the publications resarch prediction model above shows that the Residual Standard Error (RMSE): 169.43.
+
+### Coefficient Data for CWUR Publications
+```{r Summary Data for CWUR Publications}
+confint.lm(cpub1)
+print(summary(cpub1))
+#This code only shows the coefficient Data
+```
+
+At 169 Citations on average the predicted amount of publication activity would be:
+Y = a+bX
+Y = 52.5259090 + .9267652(169)
+Y = 52.5259090 + 156.6233
+Y = 209.1492
+
+The 95% CI for the slope [.93,.98] does not contain 0 so we reject the null hypothesis for the slope.
+
+##Shanghai Dataset Prediction
+
+### Publications
+```{r Shanghai Publications Prediction}
+spub1<-lm(Publications~`Highly Cited Researchers`,data=shangten) 
+  #publications ~(as a function of) HICI, data=dataset(shangten)
+
+#outcome (publications) on left, predictor (HICI/Citations) on right 
+
+print(summary(spub1))#shows the results of the regression
+```
+
+RESULTS:
+F-test = 4075       dfn=1  dfd=4891       fcv=3.84
+4075>3.84 so we reject the Ho
+
+p-value = 2.2e-16 > .5 so we fail to reject the Ho
+R-squared: .45
+
+A simple linear regression analysis shows that the activity for publicatinos can be significantly predicted based on the citations produced, F(1,4891)=3.84, p>.05, R2 = .45
+
+If the Highly Cited Researchers/Citations for the Shanghai Dataset is 0 then the intercept(publications) are predicted to be 28.33 (Est. Std). As the Highly Cited researchers/citations increases within the Shanhai Dataset (every 1 unit change) publications are predicted to increase by .61 (Est. Std).
+
+Residual Standard Error (RMSE): 9.641 on df(4893)
+
+### HICI/Citations
+```{r Point Plot of Shanghai Research/Publications by HICI/Citations, results="asis"}
+#The graph/plot below is pulling from the top ten dataset - shangten in order to present the best point plot
+
+gs2 <- ggplot(shangten, aes(x=shangten$'Highly Cited Researchers', y=Publications))+ 
+  geom_point(shape=3, alpha=.75, size=.25)+ #specifies the point by shape and size
+  geom_smooth(method = "lm")+
+  geom_smooth(method = "loess", color="darkgreen")+
+  geom_smooth(color="grey")+
+  labs(title="Regression Lines: Research/Publications by HICI/Citations in the Shangahi Top Ten Dataset", x="Research/Publications", y="HICI/Citations")
+print(gs2)
+
+##lm puts a straight line through the publication data points and is similiar to a best line fit.
+##LOESS fits a curve through the publication data points and is similar to modeling with calculus as it is the weighted sum of squared erros and may accurately account for the range within the dataset.
+```
+
+The scatterplot above with the Linear and LOESS regression lines is showing a positive relationship between the number of HICI/Citations and the number of Research/Publications produced in the Shanghai Top Ten dataset.
+
+### RMSE for Shanghai Publications
+Based on the data below the Root Mean Squared Error for the Shanghai prediction data for publications is 9.63, which means on average we are off by 10 points.
+
+```{r RMSE for Shanghai publications}
+#The code below runs the root mean squared error number from a validation of the model data above
+
+shangten<- shangten%>%add_predictions(spub1)%>%rename(preds1=pred)
+  #predict using data in memory
+  
+rmse_spub1<-modelr::rmse(spub1,shangten);rmse_spub1
+print(summary(rmse_spub1))
+  #on average we are off by 9.63 points
+```
+
+The Root Mean Squared Error (RMSE) from the validation of the publications resarch prediction model above shows that the Residual Standard Error (RMSE): 9.64.
+
+### Coefficient Data for Shanghai Publications
+```{r Summary Data for Shanghai Publications}
+confint.lm(spub1)
+print(summary(spub1))
+#This code only shows the coefficient Data
+```
+
+At 10 Citations on average the predicted amount of publication activity would be:
+Y = a+bX
+Y = 25.9254871 + .5928685(10)
+Y = 25.9254871 + 5.928685
+Y = 31.85417
+
+The 95% CI for the slope [.60,.63] does not contain 0 so we reject the null hypothesis for the slope.
+
+##Times Dataset Prediction
+
+### Publications
+```{r Times Publications Prediction}
+
+tpub1<-lm(Research~Citations,data=timesten) 
+  #research/pubs ~(as a function of) citations, data=dataset(timesten)
+
+#outcome (research/pubs) on left, predictor (citations) on right 
+
+print(summary(tpub1))#shows the results of the regression
+```
+
+RESULTS of Publications Prediction:
+F-test = 991.1       dfn=1  dfd=2598       fcv=3.84
+991.1>3.84 so we reject the Ho
+p-value = 2.2e-16 > .5 so we fail to reject the Ho
+R-squared: .2759
+
+A simple linear regression analysis shows that the activity for publicatinos can be significantly predicted based on the citations produced, F(1,2599)=3.84, p>.05, R2 = .28
+
+If the citations for the Times Dataset is 0 then the intercept(publications) are predicted to be 6.43 (Est. Std). As citations increases within the Times Dataset (every 1 unit change) research/publications are predicted to increase by .48 points (Est. Std)
+
+Residual Standard Error (RMSE): 18.09 on df(2601)
+
+### Citations
+```{r Point Plot of Times Publications by Citations, results="asis"}
+#The graph/plot below is pulling from the top ten dataset - timesten in order to present the best point plot
+
+gt2 <- ggplot(timesten, aes(x=Citations, y=Research))+
+  geom_point(shape=3, alpha=.75, size=.25)+ #specifies the points
+  geom_smooth(method = "lm")+ #linear model line
+  geom_smooth(method = "loess", color="red")+ #LOESS line
+  geom_smooth(color="grey")+
+  labs(title = "Regression Lines: Research/Publications by Citations in the Times Top Ten Dataset", x="Research/Publications", y="Citations")
+print(gt2)
+
+##lm puts a straight line through the publication data points and is similiar to a best line fit.
+##LOESS fits a curve through the publication data points and is similar to modeling with calculus as it is the weighted sum of squared erros and may accurately account for the range within the dataset.
+```
+
+The scatterplot above with the Linear and LOESS regression lines is showing a positive relationship between the number of Citations and the number of Research/Publications produced in the Times Top Ten dataset.
+
+### RMSE for Times Publications
+Based on the data below the Root Mean Squared Error for the Times prediction data for citations is 18.08, which means on average we are off by 18 points.
+
+```{r RMSE for Times publications}
+#The code below runs the root mean squared error number from a validation of the model data above
+
+timesten <- timesten%>%add_predictions(tpub1)%>%rename(predt1=pred)
+  #predict using data in memory
+  
+rmse_tpub1 <- modelr::rmse(tpub1,times);rmse_tpub1
+print(summary(rmse_tpub1))
+  #on average we are off by 18 points
+```
+
+The Root Mean Squared Error (RMSE) from the validation of the publications resarch prediction model above shows that the Residual Standard Error (RMSE): 18.08.
+
+### Coefficient Data for Times Publications
+```{r Summary Data for Times Publications}
+confint.lm(tpub1)
+print(summary(tpub1))
+#This code only shows the coefficient Data
+```
+
+At 18 Citations on average the predicted amount of publication activity would be:
+Y = a+bX
+Y = 4.4689367 + .4537283(18)
+Y = 4.4689367 + 8.167109
+Y = 12.63605
+
+The 95% CI for the slope [.45,.51] does not contain 0 so we reject the null hypothesis for the slope.
+
+## Summary RMSE data for World Ranking Dataset Publications
+```{r Prediction of the Publications under the 3 World Ranking Datasets}
+#Prediction from the Publications data under the 3 world ranking datasets
+
+print(rmse_cpub1)
+print(rmse_spub1)
+print(rmse_tpub1)
+
+```
+
+## *Summary*
+When comparing the root mean squared error for each of the three global ranking datsets the margin of error appears to be greater with the CWUR dataset at 169 errors versus the Shanghai dataset at 10 errors and the Times dataset at 18 errors.  This tells us that there is a higher possibility of errors that one may receive within the CWUR dataset when comparing Publications versus Citations.
+
+# **Models and Methods**
+
+##Implement Classifiers, Models, Predictors, etc. to solve data science problems.  Investigate the learned model and support with visualizations.  Report the accuracy and reliability of results with relevant supporting visuals.
+
+## **CWUR Top Ten Proportions, Plots & Heat Maps**
+```{r CWUR top ten Cross-tab}
+#the code below will create the CWUR Top Ten cross-tab within the CWURtt table
+
+tab_cten <- with(cwurtt,table(Publications,cwurtt$`World Rank`))
+
+#with command to make a table that uses a specific set of data
+
+tab_cten
+```
+
+```{r CWUR top ten Cross-Tab with Row and Column Titles}
+
+colnames(tab_cten) <- c("WR1","WR2","WR3","WR4","WR5","WR6","WR7","WR8","WR9","WR10")
+#the code above names the column headers - WR stands for World Rank and the number is affiliated with the rank 1-10
+
+kable(tab_cten) ##kable command will output the table in a format that is appropriate for markdown
+```
+
+
+```{r CWUR top ten Add Proportions}
+#In general recommends using proportions instead of counts.
+
+tab_cten_prop <- prop.table(tab_cten, margin=1)  #creates a proportion table
+
+kable(tab_cten_prop)
+```
+
+
+The dataset below reflects the CWUR top ten list by World Rank (WR) with the number being affiliated with the rank 1-10.  This is compared to the total number of publications produced by the world rank top ten list.
+```{r CWUR top ten Add Percentages}
+#code below will change the proportion to a %
+
+print(kable(round(tab_cten_prop*100,2)),
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:10)
+
+print(both,
+      rtitle = "CWUR Top Ten Institutions by Proportion %",
+      cnames = c("WR1","WR2","WR3","WR4","WR5","WR6","WR7","WR8","WR9","WR10")
+      
+      print(x, digits = NULL, quote = TRUE,
+      na.print = NULL, print.gap = NULL, right = FALSE,
+      max = NULL, useSource = TRUE, ...)
+
+#multiply by 100 and rounds to 2 decimal places
+#warning to not have more than 2 decimal points and when it does it indicates a false sense of percision that doesn't reflect things like measurement error or other items in the data
+```
+
+This chart reflects the Top Ten by World Rank from the CWUR dataset along with the publicatiom probabilities by Country and World Rank.
+
+```{r CWURtop ten Probability}
+#the code below produces the CWUR top ten list by Publication Probability
+
+cten_sum <- cwurtt%>%
+  group_by(Country,cwurtt$`World Rank`)%>%
+  summarize(prob_pub=mean(cwurtt$Publications,na.rm=TRUE))
+
+print(cten_sum,
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:3)
+```
+
+
+```{r CWURtop ten Divide IV into Quintiles}
+#the code below will divide the publication and citation independent variables into quintiles for the CWUR top ten dataset
+
+cwurten <- cwurten%>%
+  mutate(Publications_quintile=ntile(Publications,5),
+                Citations_quintile=ntile(Citations,5))
+```
+
+
+```{R CWUR top ten Combine Categories of two IV}
+#Create a summary dataset that shows the probabilities of the outcome across all of the combined categories of the two independent variables.
+#the code below combines the publication quintile and citation quintile categories
+
+cten1_sum <- cwurten%>%
+  group_by(Publications_quintile,Citations_quintile)%>%
+  summarize(prob_pub=mean(cwurten$Publications,na.rm=TRUE))%>%
+  arrange(-prob_pub)
+```
+
+```{r CWUR top ten Drop Missing Data}
+#Missing data isn't important, so we'll drop it such as n/a's that are in the dataset
+
+cten1_sum <- cten1_sum%>%
+  filter(!(is.na(Publications_quintile)),!(is.na(Citations_quintile)))
+```
+
+The heatmap below pulls from the CWUR top ten list by publications and citations.  As the heatmap reflects there is little variance to the gradiant related to the probabilities around publications and citations.
+```{r CWUR top ten Plot Heatmap, results="asis"}
+
+gc3 <- ggplot(cten1_sum,
+           aes(x=as.factor(Publications_quintile),
+               y=as.factor(Citations_quintile),fill=prob_pub))
+gc3 <- gc3+geom_tile()+
+  scale_fill_gradient(low="white",high="red")+
+  labs(title = "Heatmap of CWUR Top Ten by Publications & Citations", x="Publications", y="Citations")+
+  theme(legend.title=element_blank())
+
+gc3
+```
+
+## **Shanghai Top Ten Proportions, Plots & Heat Maps**
+ 
+```{r Shanghai top ten Cross-tab}
+#the code below will create the Shanghai Top Ten cross-tab within the Shangtt table
+
+tab_sten <- with(shangtt,table(Publications,`World Rank`))
+
+#with command to make a table that uses a specific set of data
+```
+
+```{r Shanghai top ten Cross-Tab with Row and Column Titles}
+
+colnames(tab_sten) <- c("WR1","WR2","WR3","WR4","WR5","WR6","WR7","WR8","WR9","WR10")
+#the code above names the column headers - WR stands for World Rank and the number is affiliated with the rank 1-10
+
+kable(tab_sten) ##kable command will output the table in a format that is appropriate for markdown
+```
+
+
+```{r Shanghai top ten Add Proportions}
+#In general recommends using proportions instead of counts.
+
+tab_sten_prop <- prop.table(tab_sten, margin=1) #creates the proportions table
+kable(tab_sten_prop)
+```
+
+```{r Shanghai top ten Add Percentages}
+#code below will change the proportion to a %
+
+kable(round(tab_sten_prop*100,0))
+
+#multiply by 100 and rounds to 0 decimal places
+#warning to not have more than 2 decimal points and when it does it indicates a false sense of percision that doesn't reflect things like measurement error or other items in the data
+```
+
+This chart reflects the Top Ten by World Rank from the Shanghai dataset along with the publicatiom probabilities by Country and World Rank.
+
+```{r Shanghai top ten Probability}
+
+sten_sum <- shangtt%>%
+  group_by(Country,shangtt$`World Rank`)%>%
+  summarize(prob_pub=mean(Publications,na.rm=TRUE))
+
+print(sten_sum,
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:10)
+```
+
+
+```{r Shanghai top ten Divide IV into Quintiles}
+#the code below will divide the publication and citation independent variables into quintiles for the CWUR top ten dataset
+
+shangten <- shangten%>%
+  mutate(Publications_quintile=ntile(Publications,5),
+         HICI_quintile=ntile(shangten$`Highly Cited Researchers`,5))
+```
+
+
+```{R Shanghai top ten Combine Categories of two IV}
+#Create a summary dataset that shows the probabilities of the outcome across all of the combined categories of the two independent variables.
+#the code below combines the publication quintile and citation quintile categories
+
+sten1_sum <- shangten%>%
+  group_by(Publications_quintile,HICI_quintile)%>%
+  summarize(prob_pub=mean(Publications,na.rm=TRUE))%>%
+  arrange(-prob_pub)
+```
+
+
+```{r Shanghai top ten Drop Missing Data}
+#Missing data isn't important, so we'll drop it such as n/a's that are in the dataset
+
+sten1_sum <- sten1_sum%>%
+  filter(!(is.na(Publications_quintile)),!(is.na(HICI_quintile)))
+```
+
+
+The heatmap below pulls from the Shanghai top ten list by publications and citations.  As the heatmap reflects there is a correlation between the probabilities of more publications having higher impact on HICI/Citations.
+```{r Shanghai top ten Plot Heatmap, results="asis"}
+
+gs3 <- ggplot(sten1_sum,
+           aes(x=as.factor(Publications_quintile),
+               y=as.factor(HICI_quintile),fill=prob_pub))
+gs3<-gs3+geom_tile()+
+  scale_fill_gradient(low="white",high="red")+
+  labs(title = "Heatmap of Shanghai Top Ten by Publications & Citations", x="Publications", y="HICI/Citations")+
+  theme(legend.title=element_blank())
+
+gs3
+```
+
+## **Times Top Ten Proportions, Plots & Heat Maps**
+ 
+```{r Timesten Cross-tab}
+#the code below will create the Times Top Ten cross-tab within the Timestt table
+
+tab_tten <- with(timestt,table(Research,`World Rank`))
+
+#with command to make a table that uses a specific set of data
+```
+
+
+```{r Timesten Add Proportions}
+#In general recommends using proportions instead of counts.
+
+#colnames(tab_tten) <- c("WR1","WR2","WR3","WR4","WR5","WR6","WR7","WR8","WR9","WR10")
+
+tab_tten_prop <- prop.table(tab_tten, margin=1)#creates the proportions table
+
+kable(tab_tten_prop)
+```
+
+```{r Timesten Add Percentages}
+#code below will change the proportion to a %
+
+kable(round(tab_tten_prop*100,2)) 
+
+#multiply by 100 and rounds to 2 decimal places
+#warning to not have more than 2 decimal points and when it does it indicates a false sense of percision that doesn't reflect things like measurement error or other items in the data
+```
+
+
+This chart reflects the Top Ten by World Rank from the Times dataset along with the publicatiom probabilities by Country and World Rank.
+```{r Timesten Probability}
+tten_sum <- timestt%>%
+  group_by(Country,`World Rank`)%>%
+  summarize(prob_pub=mean(Research,na.rm=TRUE))
+
+print(tten_sum,
+      only.contents=T,
+      comment=F,
+      sanitize.colnames.function=identity,
+      sanitize.rownames.function=identity,
+      hline.after=0:10)
+```
+
+
+```{r Timesten Divide IV into Quintiles}
+#the code below will divide the publication and citation independent variables into quintiles for the CWUR top ten dataset
+
+timesten <- timesten%>%
+  mutate(Research_quintile=ntile(Research,5),
+                Citations_quintile=ntile(Citations,5))
+```
+
+Then we'll create a summary dataset that shows the probabilitie of the outcome across all of the combined categories of the two independent variables. 
+
+```{R Timesten Combine Categories of two IV}
+#Create a summary dataset that shows the probabilities of the outcome across all of the combined categories of the two independent variables.
+#the code below combines the publication quintile and citation quintile categories
+
+tten1_sum <- timesten%>%
+  group_by(Research_quintile,Citations_quintile)%>%
+  summarize(prob_pub=mean(Research,na.rm=TRUE))%>%
+  arrange(-prob_pub)
+```
+
+
+```{r Timesten Drop Missing Data}
+#Missing data isn't important, so we'll drop it such as n/a's that are in the dataset
+
+tten1_sum <- tten1_sum%>%
+  filter(!(is.na(Research_quintile)),!(is.na(Citations_quintile)))
+```
+
+
+The heatmap below pulls from the Times dataset top ten list by publications and citations.  As the heatmap reflects there is little correlation between the probabilities of publications and citations.
+```{r Timesten Plot Heatmap, results="asis"}
+
+gt3 <- ggplot(cten1_sum,
+           aes(x=as.factor(Publications_quintile),
+               y=as.factor(Citations_quintile),fill=prob_pub))
+gt3 <- gt3+geom_tile()+
+  scale_fill_gradient(low="white",high="red")+
+  labs(title = "Heatmap of Shanghai Top Ten by Publications & Citations", x="Publications", y="HICI/Citations")+
+  theme(legend.title=element_blank())
+
+gt3
+```
+
+# *Summary*
+As I continue to compare the three global ranking systems specifically to the categories of World Rank, Publications and Citations there have been unique challenges to the probability analysis. The one dataset that ran through the probabilities and produced a standard looking heatmap was the Shanghai dataset.  There is a clear gradient from white to red when running the probabilities of publications and citations for the top ten world rank in this dataset. 
+
+The remaining two datasets, CWUR and Times do not show a successful standard heatmap with a gradient from white to red.  Instead, both show a series of cross over with one solid color - more orange than red with no white.  These results are showing little correlation to the probabilities of publications and citations.
+
+
+
+
+
+## **References**
+Grolemund, G., & Wickham, H. (2017). R for Data Science (1st ed.). Sebastopol, CA: O’Rielly Media Inc. Retrieved from https://r4ds.had.co.nz/
+
+Methodology | CWUR | Center for World University Rankings. (2012). Retrieved May 20, 2019, from https://cwur.org/methodology/world-university-rankings.php
+
+Ranking Methodology of Academic Ranking of World Universities. (2015). Retrieved May 20, 2019, from http://www.shanghairanking.com/ARWU-Methodology-2015.html
+
+World University Rankings 2015-2016 methodology. (2015). Retrieved May 20, 2019, from https://www.timeshighereducation.com/news/ranking-methodology-2016
+
+World University Rankings DataSet. (2016). Retrieved May 20, 2019, from https://www.kaggle.com/mylesoneill/world-university-rankings
